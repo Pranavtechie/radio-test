@@ -1,216 +1,77 @@
-"""
-LoRa Receiver for SX1276 on Raspberry Pi Zero 2 W
-Receives messages from Pi Pico using standard radiolib and prints to console.
-Based on LoRaRF-Python library: https://github.com/chandrawi/LoRaRF-Python
-"""
+import os, sys
+currentdir = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(os.path.dirname(os.path.dirname(currentdir)))
+from LoRaRF import SX127x, LoRaSpi, LoRaGpio
+import time
 
-import sys
+# Begin LoRa radio with connected SPI bus and IO pins (cs and reset) on GPIO
+# SPI is defined by bus ID and cs ID and IO pins defined by chip and offset number
+spi = LoRaSpi(0, 0)
+cs = LoRaGpio(0, 8)
+reset = LoRaGpio(0, 24)
+irq = LoRaGpio(0, 17)
+LoRa = SX127x(spi, cs, reset, irq)
+print("Begin LoRa radio")
+if not LoRa.begin() :
+    raise Exception("Something wrong, can't begin LoRa radio")
 
-from LoRaRF import SX127x
+# Set frequency to 915 Mhz
+print("Set frequency to 915 Mhz")
+LoRa.setFrequency(915000000)
 
+# Set RX gain to boosted gain
+print("Set RX gain to boosted gain")
+LoRa.setRxGain(LoRa.RX_GAIN_BOOSTED, LoRa.RX_GAIN_AUTO)
 
-def initialize_lora_receiver(
-    frequency: int = 915000000,
-    spreading_factor: int = 9,
-    bandwidth: int = 125000,
-    coding_rate: int = 7,
-    sync_word: int = 0x12,
-    preamble_length: int = 10,
-    reset_pin: int = 22,
-    dio1_pin: int = -1,
-    txen_pin: int = -1,
-    rxen_pin: int = -1,
-) -> SX127x:
-    """
-    Initialize LoRa module for receiving on SX1276.
+# Configure modulation parameter including spreading factor (SF), bandwidth (BW), and coding rate (CR)
+print("Set modulation parameters:\n\tSpreading factor = 7\n\tBandwidth = 125 kHz\n\tCoding rate = 4/5")
+LoRa.setSpreadingFactor(7)
+LoRa.setBandwidth(125000)
+LoRa.setCodeRate(5)
 
-    Args:
-        frequency: Operating frequency in Hz (default: 915 MHz)
-        spreading_factor: Spreading factor 7-12 (default: 9, matches radiolib)
-        bandwidth: Bandwidth in Hz (default: 125000)
-        coding_rate: Coding rate 5-8, where 5=4/5, 6=4/6, 7=4/7, 8=4/8 (default: 7)
-        sync_word: Synchronization word (default: 0x12, RADIOLIB_SX127X_SYNC_WORD)
-        preamble_length: Preamble length in symbols (default: 10, matches radiolib)
-        reset_pin: GPIO pin for RESET (default: 22)
-        dio1_pin: GPIO pin for DIO1 interrupt (default: -1 unused)
-        txen_pin: GPIO pin for TXEN (default: -1 unused)
-        rxen_pin: GPIO pin for RXEN (default: -1 unused)
+# Configure packet parameter including header type, preamble length, payload length, and CRC type
+print("Set packet parameters:\n\tExplicit header type\n\tPreamble length = 12\n\tPayload Length = 15\n\tCRC on")
+LoRa.setHeaderType(LoRa.HEADER_EXPLICIT)
+LoRa.setPreambleLength(12)
+LoRa.setPayloadLength(15)
+LoRa.setCrcEnable(True)
 
-    Returns:
-        Initialized SX127x LoRa object
-    """
-    # Initialize SX127x LoRa module
-    LoRa = SX127x()
+# Set syncronize word for public network (0x34)
+print("Set syncronize word to 0x34")
+LoRa.setSyncWord(0x34)
 
-    # Configure GPIO pins if provided
-    if reset_pin >= 0:
-        LoRa.setPins(reset_pin, dio1_pin, txen_pin, rxen_pin)
+print("\n-- LoRa Receiver Callback --\n")
 
-    # Begin initialization (required before any operations)
-    LoRa.begin()
+# receive data container
+packetData = ()
 
-    # Configure frequency
-    LoRa.setFrequency(frequency)
+def getReceiveData() :
 
-    # Configure transmit power (not needed for receive, but set anyway)
-    LoRa.setTxPower(14, LoRa.TX_POWER_SX1276)
+    global packetData
+    # Store received data
+    packetData = LoRa.read(LoRa.available())
 
-    # Configure receive gain
-    LoRa.setRxGain(LoRa.RX_GAIN_POWER_SAVING)
+# Register callback function to be called every RX done
+LoRa.onReceive(getReceiveData)
 
-    # Configure LoRa modulation parameters
-    # Low data rate optimization should be True for SF >= 11
-    # For SF=9, it's not needed (only for SF >= 11)
-    low_data_rate = spreading_factor >= 11
-    LoRa.setLoRaModulation(spreading_factor, bandwidth, coding_rate, low_data_rate)
+# Request for receiving new LoRa packet in RX continuous mode
+LoRa.request(LoRa.RX_CONTINUOUS)
 
-    # Configure LoRa packet parameters
-    # Use explicit header mode for variable length packets
-    # Maximum payload length for explicit header: 255 bytes
-    # Preamble length: 10 (matches radiolib begin parameter 6)
-    LoRa.setLoRaPacket(LoRa.HEADER_EXPLICIT, preamble_length, 255, True, False)
+# Receive message continuously
+while True :
 
-    # Set synchronize word
-    LoRa.setSyncWord(sync_word)
+    if packetData :
 
-    print("LoRa SX1276 Receiver initialized successfully!")
-    print(f"  Frequency: {frequency / 1e6:.1f} MHz")
-    print(f"  Spreading Factor: {spreading_factor}")
-    print(f"  Bandwidth: {bandwidth} Hz")
-    print(f"  Coding Rate: {coding_rate} (4/{coding_rate})")
-    print(f"  Sync Word: 0x{sync_word:02X}")
-    print(f"  Preamble Length: {preamble_length} symbols")
-    print("\nWaiting for messages...\n")
+        # Print received message and counter in serial
+        length = len(packetData) - 1
+        message = ""
+        for i in range(length) :
+            message += chr(packetData[i])
+        counter = packetData[length]
+        print(f"{message}  {counter}")
 
-    return LoRa
+        # Print packet/signal status including RSSI, SNR, and signalRSSI
+        print("Packet status: RSSI = {0:0.2f} dBm | SNR = {1:0.2f} dB".format(LoRa.packetRssi(), LoRa.snr()))
 
-
-def receive_message(lora: SX127x) -> bytes:
-    """
-    Receive a message from LoRa.
-
-    Args:
-        lora: Initialized SX127x LoRa object
-
-    Returns:
-        Received message as bytes, or empty bytes if error
-    """
-    try:
-        # Request to receive
-        lora.request()
-
-        # Wait for reception (blocks until packet received)
-        lora.wait()
-
-        # Check if data is available
-        if lora.available() > 0:
-            # Read all available bytes
-            message = bytearray()
-            while lora.available() > 0:
-                message.append(lora.read())
-            return bytes(message)
-        else:
-            return b""
-    except Exception as e:
-        print(f"Error receiving message: {e}")
-        return b""
-
-
-def bytes_to_text(data: bytes) -> str:
-    """
-    Convert bytes to text, trying UTF-8 first, then ASCII, then fallback to hex.
-
-    Args:
-        data: Bytes to convert
-
-    Returns:
-        String representation of the data
-    """
-    if not data:
-        return ""
-
-    # Try UTF-8 first
-    try:
-        text = data.decode("utf-8")
-        # Remove null bytes and other control characters that might be padding
-        text = text.rstrip("\x00")
-        return text
-    except UnicodeDecodeError:
-        pass
-
-    # Try ASCII
-    try:
-        text = data.decode("ascii")
-        text = text.rstrip("\x00")
-        return text
-    except UnicodeDecodeError:
-        pass
-
-    # Fallback to hex representation
-    return f"<hex: {data.hex()}>"
-
-
-def main():
-    """Main receiver loop"""
-    # Configuration - MUST match your Pi Pico radiolib settings
-    # Based on: radio.begin(915.0, 125.0, 9, 7, RADIOLIB_SX127X_SYNC_WORD, 10, 8, 0)
-    FREQUENCY = 915000000  # 915 MHz
-    SPREADING_FACTOR = 9  # SF9 (from radiolib begin: parameter 3)
-    BANDWIDTH = 125000  # 125 kHz
-    CODING_RATE = 7  # 4/7 (from radiolib begin: parameter 4, where 7 = 4/7)
-    SYNC_WORD = 0x12  # RADIOLIB_SX127X_SYNC_WORD (from radiolib begin: parameter 5)
-    PREAMBLE_LENGTH = 10  # 10 symbols (from radiolib begin: parameter 6)
-
-    # GPIO pin configuration (adjust if your wiring is different)
-    RESET_PIN = 22
-    DIO1_PIN = -1  # -1 means unused
-    TXEN_PIN = -1  # -1 means unused
-    RXEN_PIN = -1  # -1 means unused
-
-    try:
-        # Initialize LoRa receiver
-        lora = initialize_lora_receiver(
-            frequency=FREQUENCY,
-            spreading_factor=SPREADING_FACTOR,
-            bandwidth=BANDWIDTH,
-            coding_rate=CODING_RATE,
-            sync_word=SYNC_WORD,
-            preamble_length=PREAMBLE_LENGTH,
-            reset_pin=RESET_PIN,
-            dio1_pin=DIO1_PIN,
-            txen_pin=TXEN_PIN,
-            rxen_pin=RXEN_PIN,
-        )
-
-        # Continuous receive loop
-        packet_count = 0
-        while True:
-            # Receive message (blocks until packet is received)
-            message = receive_message(lora)
-
-            if message:
-                packet_count += 1
-                # Convert to text
-                text = bytes_to_text(message)
-
-                # Print received message
-                print(f"[Packet #{packet_count}]")
-                print(f"  Length: {len(message)} bytes")
-                print(f"  Data: {text}")
-                print(f"  Hex: {message.hex()}")
-                print()
-            # If message is empty, continue waiting (shouldn't happen in normal operation)
-
-    except KeyboardInterrupt:
-        print("\n\nReceiver stopped by user")
-        sys.exit(0)
-    except Exception as e:
-        print(f"\nError: {e}")
-        import traceback
-
-        traceback.print_exc()
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()
+        # Reset receive data container
+        packetData = ()
