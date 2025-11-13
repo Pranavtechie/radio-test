@@ -1,15 +1,18 @@
 import os, sys
 currentdir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.dirname(os.path.dirname(currentdir)))
-from LoRaRF import SX127x, LoRaSpi, LoRaGpio
+from LoRaRF import SX127x #, LoRaSpi, LoRaGpio
 import time
 
 # Begin LoRa radio with connected SPI bus and IO pins (cs and reset) on GPIO
 # SPI is defined by bus ID and cs ID and IO pins defined by chip and offset number
-spi = LoRaSpi(0, 0)
-cs = LoRaGpio(0, 8)
-reset = LoRaGpio(0, 24)
-LoRa = SX127x(spi, cs, reset)
+# spi = LoRaSpi(0, 0)
+# cs = LoRaGpio(0, 8)
+# reset = LoRaGpio(0, 22)
+# LoRa = SX127x(spi, cs, reset)
+LoRa = SX127x()
+LoRa.setPins(22, 26, 5, 6)
+
 print("Begin LoRa radio")
 if not LoRa.begin() :
     raise Exception("Something wrong, can't begin LoRa radio")
@@ -20,7 +23,7 @@ LoRa.setFrequency(915000000)
 
 # Set TX power, this function will set PA config with optimal setting for requested TX power
 print("Set TX power to +17 dBm")
-LoRa.setTxPower(17, LoRa.TX_POWER_PA_BOOST)                     # TX power +17 dBm using PA boost pin
+LoRa.setTxPower(15, LoRa.TX_POWER_PA_BOOST)                     # TX power +17 dBm using PA boost pin
 
 # Configure modulation parameter including spreading factor (SF), bandwidth (BW), and coding rate (CR)
 # Receiver must have same SF and BW setting with transmitter to be able to receive LoRa packet
@@ -49,6 +52,8 @@ message = "HeLoRa World!\0"
 messageList = list(message)
 for i in range(len(messageList)) : messageList[i] = ord(messageList[i])
 counter = 0
+
+
 
 # Transmit message continuously
 while True :

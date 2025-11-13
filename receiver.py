@@ -1,16 +1,17 @@
 import os, sys
 currentdir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.dirname(os.path.dirname(currentdir)))
-from LoRaRF import SX127x, LoRaSpi, LoRaGpio
+from LoRaRF import SX127x #, LoRaSpi, LoRaGpio
 import time
 
 # Begin LoRa radio with connected SPI bus and IO pins (cs and reset) on GPIO
 # SPI is defined by bus ID and cs ID and IO pins defined by chip and offset number
-spi = LoRaSpi(0, 0)
-cs = LoRaGpio(0, 8)
-reset = LoRaGpio(0, 24)
-irq = LoRaGpio(0, 17)
-LoRa = SX127x(spi, cs, reset, irq)
+#spi = LoRaSpi(0, 0)
+#cs = LoRaGpio(0, 8)
+#reset = LoRaGpio(0, 24)
+#irq = LoRaGpio(0, 17)
+LoRa = SX127x()
+LoRa.setPins(22, 26, -1, -1)
 print("Begin LoRa radio")
 if not LoRa.begin() :
     raise Exception("Something wrong, can't begin LoRa radio")
@@ -33,7 +34,7 @@ LoRa.setCodeRate(5)
 print("Set packet parameters:\n\tExplicit header type\n\tPreamble length = 12\n\tPayload Length = 15\n\tCRC on")
 LoRa.setHeaderType(LoRa.HEADER_EXPLICIT)
 LoRa.setPreambleLength(12)
-LoRa.setPayloadLength(15)
+LoRa.setPayloadLength(255)
 LoRa.setCrcEnable(True)
 
 # Set syncronize word for public network (0x34)
@@ -41,6 +42,15 @@ print("Set syncronize word to 0x34")
 LoRa.setSyncWord(0x34)
 
 print("\n-- LoRa Receiver Callback --\n")
+
+import RPi.GPIO as GPIO
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(5, GPIO.OUT)
+GPIO.setup(6, GPIO.OUT)
+
+GPIO.output(6, GPIO.LOW)
+GPIO.output(5, GPIO.HIGH)
+
 
 # receive data container
 packetData = ()
@@ -50,7 +60,7 @@ def getReceiveData() :
     global packetData
     # Store received data
     packetData = LoRa.read(LoRa.available())
-
+"""
 # Register callback function to be called every RX done
 LoRa.onReceive(getReceiveData)
 
@@ -74,4 +84,21 @@ while True :
         print("Packet status: RSSI = {0:0.2f} dBm | SNR = {1:0.2f} dB".format(LoRa.packetRssi(), LoRa.snr()))
 
         # Reset receive data container
-        packetData = ()
+   
+
+   packetData = ()
+
+   """
+
+while True:
+    print("Starting receive")
+    LoRa.request()
+    LoRa.wait()
+
+    message = ""
+
+    while LoRa.available() > 1:
+        message += chr(LoRa.read())
+    counter = LoRa.read()
+
+    print(f"{message} {counter}")
