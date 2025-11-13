@@ -1,23 +1,15 @@
 import os, sys
 currentdir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.dirname(os.path.dirname(currentdir)))
-from LoRaRF import SX127x
+from LoRaRF import SX127x, LoRaSpi, LoRaGpio
+import time
 
-# Begin LoRa radio - initialize SX127x module
-# The SX127x handles SPI communication automatically
-# GPIO pins are set using setPins() method
-LoRa = SX127x()
-
-# Set GPIO pins (reset pin, dio1 pin, txen pin, rxen pin)
-# Using GPIO pin numbers: reset=24, others unused (-1)
-# Note: CS pin is handled automatically by SPI interface
-# Adjust reset_pin if your hardware uses a different GPIO pin
-reset_pin = 24
-dio1_pin = -1  # Unused
-txen_pin = -1  # Unused
-rxen_pin = -1  # Unused
-LoRa.setPins(reset_pin, dio1_pin, txen_pin, rxen_pin)
-
+# Begin LoRa radio with connected SPI bus and IO pins (cs and reset) on GPIO
+# SPI is defined by bus ID and cs ID and IO pins defined by chip and offset number
+spi = LoRaSpi(0, 0)
+cs = LoRaGpio(0, 8)
+reset = LoRaGpio(0, 24)
+LoRa = SX127x(spi, cs, reset)
 print("Begin LoRa radio")
 if not LoRa.begin() :
     raise Exception("Something wrong, can't begin LoRa radio")
