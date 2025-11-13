@@ -16,15 +16,28 @@ wheels = [
 ]
 
 [[package]]
+name = "pylora"
+version = "0.3.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/25/29/30ff803d2875457f3d67e821bfcf8a201e8f5bc90b8193f6722d69026cd2/pyLoRa-0.3.1.tar.gz", hash = "sha256:5e188e4ae4a53ce7cc5325bf8864ccadf63b4c8ce3c4800115877d46ef269c5b", size = 33293, upload-time = "2019-04-23T17:38:00.218Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/46/ab/a3ddafd7ab4ca37aad689b8363a31f159026f2be47fd337bb013edaf1f27/pyLoRa-0.3.1-py3-none-any.whl", hash = "sha256:905f648f21f40d8691a6520dbdbc04755a78db906046e8fc4e49d03a62561a8d", size = 40974, upload-time = "2019-04-23T17:37:58.501Z" },
+]
+
+[[package]]
 name = "radio-only"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "lorarf" },
+    { name = "pylora" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "lorarf", specifier = ">=1.4.0" }]
+requires-dist = [
+    { name = "lorarf", specifier = ">=1.4.0" },
+    { name = "pylora", specifier = ">=0.3.1" },
+]
 
 [[package]]
 name = "rpi-gpio"
