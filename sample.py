@@ -20,8 +20,7 @@ LoRa.setPins(reset_pin, dio1_pin, txen_pin, rxen_pin)
 
 print("Begin LoRa radio")
 if not LoRa.begin() :
-    # You can access the error code using LoRa.getLastError()
-    print(f"LoRa begin failed with error code: {LoRa.getLastError()}")
+    # You can access the error code using LoRa.getLastError()   
     raise Exception("Something wrong, can't begin LoRa radio")
 
 
